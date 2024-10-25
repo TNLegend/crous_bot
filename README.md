@@ -13,7 +13,7 @@ Before running the script, ensure you have Python installed on your machine. The
 
 ## Installation
 
-First, you need to clone this repository or download the script to your local machine. After obtaining the script, install the required Python libraries using pip:
+First, clone this repository or download the script to your local machine. After obtaining the script, install the required Python libraries using pip:
 
 ```bash
 pip install requests beautifulsoup4 python-dotenv
@@ -25,12 +25,11 @@ To run the script, you need to set up an `.env` file in the same directory as th
 
 ```
 GMAIL_USER=your-email@gmail.com
-GMAIL_PASS=your-email-password
+GMAIL_PASS=your-app-password
 EMAIL_RECIPIENTS=recipient1@example.com,recipient2@example.com
 ```
 
-**Important**: Replace `your-email@gmail.com` and `your-email-password` with your Gmail credentials, and `recipient1@example.com,recipient2@example.com` with the comma-separated email addresses of the recipients you want to notify. It is crucial to change these credentials to those that you intend to use for sending emails.
-
+**Important**: Replace `your-email@gmail.com` with your Gmail address, and `your-app-password` with a Gmail app password. You can generate an app password by following the instructions [here](https://myaccount.google.com/apppasswords). Replace `recipient1@example.com,recipient2@example.com` with the comma-separated email addresses of the recipients you want to notify.
 
 ## Geographical Limitation
 
