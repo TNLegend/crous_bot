@@ -1,6 +1,3 @@
-Here's a `README.md` file that outlines the prerequisites, installation instructions, and usage details for the script, including information about the `.env` file and the script's current geographical limitation to Marseille.
-
----
 
 # Accommodation Finder Script for Marseille
 
