@@ -17,9 +17,9 @@ GMAIL_PASS = os.getenv('GMAIL_PASS')
 EMAIL_RECIPIENTS = os.getenv('EMAIL_RECIPIENTS').split(',')
 # Constants
 BASE_URL = 'https://trouverunlogement.lescrous.fr'
-URL = 'https://trouverunlogement.lescrous.fr/tools/36/search?bounds=5.2286902_43.3910329_5.5324758_43.1696205&'
-#URL = 'https://trouverunlogement.lescrous.fr/tools/36/search?'
-CHECK_INTERVAL = 30 # Check every 2 mins
+URL = 'https://trouverunlogement.lescrous.fr/tools/41/search?bounds=5.2286902_43.3910329_5.5324758_43.1696205&'   #marseille
+#URL = 'https://trouverunlogement.lescrous.fr/tools/41/search?'
+CHECK_INTERVAL = 30 # Check every 30 secs
 
 
 # Previous state
@@ -106,40 +106,72 @@ def fetch_accommodations():
 
 
 def is_accommodation_available(accommodation_id):
-    """Check if the accommodation is available by checking its detail page."""
-    detail_url = f"{BASE_URL}/tools/36/accommodations/{accommodation_id}"
-    response = requests.get(detail_url)
+    """Check if the accommodation is available and get its superficie."""
+    detail_url = f"{BASE_URL}/tools/41/accommodations/{accommodation_id}"
+    try:
+        response = requests.get(detail_url, timeout=10)
+        response.raise_for_status()  # Will raise an error for bad status codes
 
-    if response.status_code == 200:
         soup = BeautifulSoup(response.content, 'html.parser')
+
         # Check for the availability button
         unavailable_button = soup.find('button', title='Indisponible')
-        return accommodation_id, unavailable_button is None  # Return ID and availability status
-    return accommodation_id, False  # Return ID and False if the request fails
+        is_available = unavailable_button is None
+
+        # --- NEW CODE TO EXTRACT SUPERFICIE ---
+        superficie = 'N/A'  # Default value
+        superficie_tag = soup.find('strong', string=re.compile(r'\s*Superficie\s*:\s*'))
+        if superficie_tag and superficie_tag.next_sibling:
+            superficie = superficie_tag.next_sibling.strip()
+        # --- END OF NEW CODE ---
+
+        return accommodation_id, is_available, superficie  # Return all three values
+
+    except requests.RequestException as e:
+        print(f"Could not check page for ID {accommodation_id}: {e}")
+        return accommodation_id, False, 'N/A'  # Return defaults on error
 
 
 def check_accommodations_availability(accommodations):
-    """Check the availability of accommodations in a multithreaded manner."""
-    if accommodations:  # Check if the accommodations dictionary is empty
-        num_threads = min(10, len(accommodations))  # Use up to 10 threads or the number of accommodations
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            # Map the function to each accommodation ID
-            results = list(executor.map(is_accommodation_available, accommodations.keys()))
+    """Check availability of accommodations and add superficie details."""
+    if not accommodations:
+        return {}
 
-        # Create a dictionary mapping accommodation IDs to their details
-        available_accommodations = {acc_id: accommodations[acc_id] for acc_id, is_available in results if is_available}
-        return available_accommodations
-    return {}
+    available_accommodations = {}
+    num_threads = min(10, len(accommodations))
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        # The map function will now return tuples of (id, is_available, superficie)
+        results = list(executor.map(is_accommodation_available, accommodations.keys()))
+
+    # --- UPDATED LOGIC TO PROCESS RESULTS ---
+    for acc_id, is_available, superficie in results:
+        if is_available:
+            # If it's available, add the superficie to its details
+            accommodations[acc_id]['superficie'] = superficie
+            available_accommodations[acc_id] = accommodations[acc_id]
+    # --- END OF UPDATED LOGIC ---
+
+    return available_accommodations
 
 
 def send_email(new_accommodations):
-    """Send an email with the new accommodation details."""
+    """Send an email with the new accommodation details, including superficie."""
     msg = MIMEMultipart()
     msg['From'] = GMAIL_USER
     msg['To'] = ', '.join(EMAIL_RECIPIENTS)
     msg['Subject'] = 'New CROUS Accommodation Available'
 
-    body_lines = [f"Name: {details['name']}\nPrice: {details['price']}\nLocation: {details['location']}\nLink: {details['link']}\n" for details in new_accommodations.values()]
+    # --- UPDATED BODY TO INCLUDE SUPERFICIE ---
+    body_lines = [
+        f"Name: {details['name']}\n"
+        f"Price: {details['price']}\n"
+        f"Location: {details['location']}\n"
+        f"Superficie: {details.get('superficie', 'N/A')}\n"  # Added this line
+        f"Link: {details['link']}\n"
+        for details in new_accommodations.values()
+    ]
+    # --- END OF UPDATE ---
+
     body = f"New accommodations found:\n\n" + "\n".join(body_lines) + f"\nTotal Available: {len(new_accommodations)}"
     msg.attach(MIMEText(body, 'plain'))
 
